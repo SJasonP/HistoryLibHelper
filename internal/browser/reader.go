@@ -26,7 +26,7 @@ func Read(ctx context.Context, profile model.Profile) ([]model.Record, error) {
 	}
 	snapshot := filepath.Join(tempDir, "history.sqlite")
 	if err := createSnapshot(ctx, profile.Database, snapshot); err != nil {
-		return nil, fmt.Errorf("snapshot %s: %w; close the browser and try again / 请退出浏览器后重试", profile.Browser, err)
+		return nil, fmt.Errorf("snapshot %s: %w", profile.Browser, err)
 	}
 	db, err := sql.Open("sqlite", sqliteURI(snapshot, "ro"))
 	if err != nil {
@@ -75,7 +75,15 @@ func createSnapshot(ctx context.Context, source, destination string) error {
 }
 
 func sqliteURI(path, mode string) string {
-	u := url.URL{Scheme: "file", Path: path}
+	// url.URL treats a Windows drive letter as a URI authority when the path
+	// still contains backslashes (file:C:%5CUsers...). modernc SQLite rejects
+	// that URI before it even attempts to open the database. Convert native
+	// separators and make drive-letter paths absolute URI paths instead.
+	uriPath := filepath.ToSlash(path)
+	if volume := filepath.VolumeName(path); volume != "" && !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	u := url.URL{Scheme: "file", Path: uriPath}
 	q := u.Query()
 	q.Set("mode", mode)
 	q.Set("_pragma", "busy_timeout(5000)")

@@ -111,8 +111,12 @@ func TestExportReplacesExistingArchiveOnlyAfterSuccess(t *testing.T) {
 	if result.Output != output {
 		t.Fatalf("output=%q", result.Output)
 	}
-	if _, err = zip.OpenReader(output); err != nil {
+	replacement, err := zip.OpenReader(output)
+	if err != nil {
 		t.Fatalf("replacement is not a valid archive: %v", err)
+	}
+	if err = replacement.Close(); err != nil {
+		t.Fatalf("close replacement archive: %v", err)
 	}
 	matches, err := filepath.Glob(filepath.Join(directory, ".existing.HLZ.tmp-*"))
 	if err != nil {

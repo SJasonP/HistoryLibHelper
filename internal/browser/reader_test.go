@@ -3,12 +3,34 @@ package browser
 import (
 	"context"
 	"database/sql"
+	"net/url"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"historylibhelper/internal/model"
 	_ "modernc.org/sqlite"
 )
+
+func TestSQLiteURIUsesValidWindowsFilePath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows path regression test")
+	}
+
+	rawPath := `C:\Users\Test User\AppData\Local\Microsoft\Edge\User Data\Default\History`
+	rawURI := sqliteURI(rawPath, "ro")
+	u, err := url.Parse(rawURI)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Scheme != "file" || u.Host != "" || u.Path != "/C:/Users/Test User/AppData/Local/Microsoft/Edge/User Data/Default/History" {
+		t.Fatalf("invalid Windows SQLite URI %q (parsed as %#v)", rawURI, u)
+	}
+	if strings.Contains(rawURI, `%5C`) {
+		t.Fatalf("Windows separators were encoded into SQLite URI: %q", rawURI)
+	}
+}
 
 func TestReadChromiumSnapshot(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "History")
